@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TextGen sample</title>
+  <script src="https://cdn.jsdelivr.net/npm/lodash/lodash.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uifactory"></script>
+</head>
+<body>
+
+  <template component="text-gen" noun="" start="" end="">
+    <%= textGen.render(this, obj) %>
+    <script>
+      let textGen = {
+        render: function (el, obj) {
+          // Get all
+          let templates = Array.from(el.querySelectorAll('template'))
+          let weights = templates.map(v => +v.getAttribute('weight') || 1)
+          let rand = Math.random() * _.sum(weights)
+          let i = 0
+          for (; i<weights.length && rand > 0; i++)
+            rand -= weights[i]
+          return _.template(_.unescape(templates[i - 1].innerHTML))(obj)
+        }
+      }
+    </script>
+  </template>
+
+  <text-gen noun="Attrition" start="first quarter" end="fourth quarter">
+    <template><%= noun %> for <%= end %> is [todo] than <%= start %></template>
+    <template>In <%= end %>, <%= noun %> is [todo] than <%= start %></template>
+  </text-gen>
+
+</body>
+</html>

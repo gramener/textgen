@@ -16,7 +16,7 @@ Add this to your page to generate text from data.
   - Including Priorities
   - Entities are attributes
   - Calibrations are attributes, supported by lookup functions
-- [x] Templates with weights
+- [xx] Templates with weights
 - [x] Grammar: npm/humanize
 
 ## Component Design
