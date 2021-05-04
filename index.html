@@ -7,31 +7,50 @@
   <title>TextGen sample</title>
   <script src="https://cdn.jsdelivr.net/npm/lodash/lodash.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/uifactory"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@6.7.0/dist/d3.min.js"></script>
 </head>
 <body>
 
-  <template component="text-gen" noun="" start="" end="">
+  <template component="text-gen" noun="" start="" end="" value:number="0" calibration:object="{}">
     <%= textGen.render(this, obj) %>
     <script>
       let textGen = {
         render: function (el, obj) {
-          // Get all
           let templates = Array.from(el.querySelectorAll('template'))
           let weights = templates.map(v => +v.getAttribute('weight') || 1)
-          let rand = Math.random() * _.sum(weights)
-          let i = 0
-          for (; i<weights.length && rand > 0; i++)
-            rand -= weights[i]
-          return _.template(_.unescape(templates[i - 1].innerHTML))(obj)
+          let weightScale = d3.scaleQuantize()
+            .domain(weights)
+            .range(templates)
+          let tmpl = weightScale(Math.random() * _.sum(weights))
+          if (typeof obj.calibration != 'function')
+            obj.calibration = d3.scaleQuantize()
+              .domain(obj.calibration.domain)
+              .range(obj.calibration.range)
+          return _.template(_.unescape(tmpl.innerHTML))(obj)
         }
       }
     </script>
   </template>
 
-  <text-gen noun="Attrition" start="first quarter" end="fourth quarter">
-    <template><%= noun %> for <%= end %> is [todo] than <%= start %></template>
-    <template>In <%= end %>, <%= noun %> is [todo] than <%= start %></template>
+
+
+
+  <!-- This is where the usage begins -->
+
+  <text-gen noun="Attrition" start="first quarter" end="fourth quarter" value="0.4" calibration="{
+    domain: [0, 0.5, 1],
+    range: ['smaller', 'about the same as', 'larger than']
+  }">
+    <template><%= noun %> for <%= end %> is <%= calibration(value) %> than <%= start %></template>
+    <template>In <%= end %>, <%= noun %> is <%= calibration(value) %> than <%= start %></template>
   </text-gen>
 
+  <!-- This is where the usage ends -->
+
+  <script>
+    setInterval(function () {
+      document.querySelector('text-gen').setAttribute('value', Math.random())
+    }, 1000)
+  </script>
 </body>
 </html>
