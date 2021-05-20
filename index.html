@@ -11,46 +11,106 @@
 </head>
 <body>
 
-  <template component="text-gen" noun="" start="" end="" value:number="0" calibration:object="{}">
+  <template component="text-gen">
     <%= textGen.render(this, obj) %>
     <script>
-      let textGen = {
-        render: function (el, obj) {
-          let templates = Array.from(el.querySelectorAll('template'))
-          let weights = templates.map(v => +v.getAttribute('weight') || 1)
-          let weightScale = d3.scaleQuantize()
-            .domain(weights)
-            .range(templates)
-          let tmpl = weightScale(Math.random() * _.sum(weights))
-          if (typeof obj.calibration != 'function')
-            obj.calibration = d3.scaleQuantize()
-              .domain(obj.calibration.domain)
-              .range(obj.calibration.range)
-          return _.template(_.unescape(tmpl.innerHTML))(obj)
+      (function (window) {
+        window.textGen = {
+          render: function (el, obj) {
+            obj = Object.assign({}, obj)
+            // Get the template element. By default, it's the text-gen component
+            let tmpl = el
+            // But if it has <template>s inside it, THOSE are the templates. Pick based on weight=""
+            // TODO: Precompile
+            let templates = Array.from(el.querySelectorAll('template'))
+            if (templates.length > 0) {
+              let weights = templates.map(v => +v.getAttribute('weight') || 1)
+              let weightScale = d3.scaleQuantize()
+                .domain(weights)
+                .range(templates)
+              tmpl = weightScale(Math.random() * _.sum(weights))
+            }
+            // Parse data objects as entities
+            for (let node of el.attributes) {
+              try {
+                let fn = new Function('obj', `with (obj) { return (${node.value}) }`)
+                obj[node.name] = fn(obj)
+              } catch (e) {
+                // TODO: Can we make this explicit? Ignore attributes like class
+                obj[node.name] = node.value
+                // console.log(e)
+              }
+            }
+            // Load the calibration, if not already loaded.
+            // Initially, obj.calibration has {domain: [...], range: [...]}.
+            // We compile it into a function: calibration(value) => result
+            if (typeof obj.calibration != 'function' && obj.calibration && obj.calibration.domain && obj.calibration.range) {
+              obj.calibration = d3.scaleThreshold()
+                .domain(obj.calibration.domain)
+                .range(obj.calibration.range)
+            }
+            // Render the template
+            return _.template(_.unescape(tmpl.innerHTML))(obj)
+            // TODO: error reporting
+          }
         }
-      }
+      })(window)
     </script>
   </template>
 
 
-
-
   <!-- This is where the usage begins -->
 
-  <text-gen noun="Attrition" start="first quarter" end="fourth quarter" value="0.4" calibration="{
+  <text-gen class="x" noun="Attrition" greeting="'Hello" start="first quarter" end="fourth quarter" value="0.4" calibration="{
     domain: [0, 0.5, 1],
     range: ['smaller', 'about the same as', 'larger than']
   }">
-    <template><%= noun %> for <%= end %> is <%= calibration(value) %> than <%= start %></template>
-    <template>In <%= end %>, <%= noun %> is <%= calibration(value) %> than <%= start %></template>
+    <%= greeting %>! <%= noun %> for <%= end %> is <%= calibration(value) %> than <%= start %>
   </text-gen>
-
-  <!-- This is where the usage ends -->
+  <hr>
+  <text-gen class="y" noun="Attrition" start="first quarter" end="fourth quarter" value="0.4" calibration="{
+    domain: [0, 0.5, 1],
+    range: ['smaller', 'about the same as', 'larger than']
+  }">
+    <template weight="1">1: <%= noun %> for <%= end %> is <%= calibration(value) %> than <%= start %></template>
+    <template weight="2">2: In <%= end %>, <%= noun %> is <%= calibration(value) %> than <%= start %></template>
+  </text-gen>
+  <hr>
 
   <script>
-    setInterval(function () {
-      document.querySelector('text-gen').setAttribute('value', Math.random())
-    }, 1000)
+    let data = [
+      {country: "Germany", cases: 11},
+      {country: "India", cases: 23},
+      {country: "Spain", cases: 33},
+      {country: "Russia", cases: 90},
+      {country: "Angola", cases: 29},
+      {country: "France", cases: 100},
+    ]
   </script>
+  <text-gen
+    data="_.reverse(_.sortBy(data, 'cases'))"
+    x="_.filter(data, {'country': 'Russia'})[0]"
+    y="data[0]"
+    calibration="{
+      domain: [0.3, 0.5, 0.8],
+      range: ['much smaller', 'smaller', 'a bit smaller', 'almost same as']
+    }">
+    <%= x.country %> is <%= calibration(x.cases / y.cases) %> than <%= y.country %>, which has <%= y.cases %> daily cases.
+  </text-gen>
+  <hr>
+
+  <!-- Up to here, things work. But let's make it user friendly -->
+
+  <text-gen
+    class="x"
+    greeting="Hello"
+    data:formula="sort(data, '-cases')"
+    x:formula="pick(data, {country='Russia'})"
+    y:formula="first(data)"
+    calibration:scaleThreshold="[0.3, 0.5, 0.8], ['much smaller', 'smaller', 'a bit smaller', 'almost same as']"></text-gen>
+    <%= x.country %> is <%= calibration(x.cases / y.cases) %> than <%= y.country %>, which has <%= y.cases %> daily cases.
+  </text-gen>
+  <!-- This is where the usage ends -->
+
 </body>
 </html>
