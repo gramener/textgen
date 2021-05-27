@@ -6,11 +6,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TextGen sample</title>
   <script src="https://cdn.jsdelivr.net/npm/lodash/lodash.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/uifactory"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uifactory@0.0.8/uifactory.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3@6.7.0/dist/d3.min.js"></script>
 </head>
 <body>
 
+  <script>
+    uifactory.types.formula = {
+      parse: (string, name, obj) => {
+        let fn = new Function('obj', `with (obj) { return (${string}) }`)
+        return fn(obj)
+      },
+      stringify: value => JSON.stringify(value)
+    }
+    uifactory.types.scalethreshold = {
+      parse: string => {
+        let [domain, range] = string.split(/=>/)
+        return d3.scaleThreshold()
+          .domain(domain.split(/,/).map(v => +v))
+          .range(range.split(/,/).map(v => v.trim()))
+      },
+      stringify: value => JSON.stringify(value)
+    }
+  </script>
   <template component="text-gen">
     <%= textGen.render(this, obj) %>
     <script>
@@ -30,25 +48,6 @@
                 .range(templates)
               tmpl = weightScale(Math.random() * _.sum(weights))
             }
-            // Parse data objects as entities
-            for (let node of el.attributes) {
-              try {
-                let fn = new Function('obj', `with (obj) { return (${node.value}) }`)
-                obj[node.name] = fn(obj)
-              } catch (e) {
-                // TODO: Can we make this explicit? Ignore attributes like class
-                obj[node.name] = node.value
-                // console.log(e)
-              }
-            }
-            // Load the calibration, if not already loaded.
-            // Initially, obj.calibration has {domain: [...], range: [...]}.
-            // We compile it into a function: calibration(value) => result
-            if (typeof obj.calibration != 'function' && obj.calibration && obj.calibration.domain && obj.calibration.range) {
-              obj.calibration = d3.scaleThreshold()
-                .domain(obj.calibration.domain)
-                .range(obj.calibration.range)
-            }
             // Render the template
             return _.template(_.unescape(tmpl.innerHTML))(obj)
             // TODO: error reporting
@@ -61,17 +60,13 @@
 
   <!-- This is where the usage begins -->
 
-  <text-gen class="x" noun="Attrition" greeting="'Hello" start="first quarter" end="fourth quarter" value="0.4" calibration="{
-    domain: [0, 0.5, 1],
-    range: ['smaller', 'about the same as', 'larger than']
-  }">
+  <text-gen class="x" noun:str="Attrition" greeting:str="'Hello" start:str="first quarter" end:str="fourth quarter" value:number="0.4"
+    calibration:scalethreshold="0, 0.5, 1 => smaller, about the same as, larger than">
     <%= greeting %>! <%= noun %> for <%= end %> is <%= calibration(value) %> than <%= start %>
   </text-gen>
   <hr>
-  <text-gen class="y" noun="Attrition" start="first quarter" end="fourth quarter" value="0.4" calibration="{
-    domain: [0, 0.5, 1],
-    range: ['smaller', 'about the same as', 'larger than']
-  }">
+  <text-gen class="y" noun:str="Attrition" start:str="first quarter" end:str="fourth quarter" value:number="0.4"
+    calibration:scalethreshold="0, 0.5, 1 => smaller, about the same as, larger than">
     <template weight="1">1: <%= noun %> for <%= end %> is <%= calibration(value) %> than <%= start %></template>
     <template weight="2">2: In <%= end %>, <%= noun %> is <%= calibration(value) %> than <%= start %></template>
   </text-gen>
@@ -88,28 +83,33 @@
     ]
   </script>
   <text-gen
-    data="_.reverse(_.sortBy(data, 'cases'))"
-    x="_.filter(data, {'country': 'Russia'})[0]"
-    y="data[0]"
-    calibration="{
-      domain: [0.3, 0.5, 0.8],
-      range: ['much smaller', 'smaller', 'a bit smaller', 'almost same as']
-    }">
+    data:formula="_.reverse(_.sortBy(data, 'cases'))"
+    x:formula="_.filter(data, {'country': 'Russia'})[0]"
+    y:formula="data[0]"
+    calibration:scalethreshold="0.3, 0.5, 0.8 => much smaller, smaller, a bit smaller, almost same as"
+  >
+    <% console.log(calibration) %>
     <%= x.country %> is <%= calibration(x.cases / y.cases) %> than <%= y.country %>, which has <%= y.cases %> daily cases.
   </text-gen>
   <hr>
 
   <!-- Up to here, things work. But let's make it user friendly -->
 
+  <script>
+    // DEFINE YOUR OWN TYPES
+    // DEFINE YOUR OWN FUNCTIONS if you need
+    // Make the following generatable by Excel
+  </script>
   <text-gen
     class="x"
-    greeting="Hello"
+    greeting:str="Hello"
     data:formula="sort(data, '-cases')"
     x:formula="pick(data, {country='Russia'})"
     y:formula="first(data)"
-    calibration:scaleThreshold="[0.3, 0.5, 0.8], ['much smaller', 'smaller', 'a bit smaller', 'almost same as']"></text-gen>
+    calibration:scalethreshold="0.3, 0.5, 0.8 => 'much smaller', 'smaller', 'a bit smaller', 'almost same as'">
     <%= x.country %> is <%= calibration(x.cases / y.cases) %> than <%= y.country %>, which has <%= y.cases %> daily cases.
   </text-gen>
+  <hr>
   <!-- This is where the usage ends -->
 
 </body>
